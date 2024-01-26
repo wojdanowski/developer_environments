@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Test backend",
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}/apps/",
+      "program": "${workspaceFolder}/node_modules/@nrwl/cli/bin/nx.js",
+      "console": "internalConsole",
+      "internalConsoleOptions": "neverOpen",
+      "args":[ "run", "${input:serviceName}:test", "--verbose", "--test-file=${input:testFileToRun}"]
+    },
+    {
+      "name": "Debug backend",
+      "type": "node",
+      "request": "attach",
+      "port": 60538,
+      "address": "0.0.0.0"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "testFileToRun",
+      "type": "promptString",
+      "description": "Enter test file to run. Example: createField.spec.ts"
+    },
+    {
+      "id": "serviceName",
+      "type": "promptString",
+      "description": "Enter service name to run. Example: field-service"
+    }
+  ],
+  "compounds": []
+}

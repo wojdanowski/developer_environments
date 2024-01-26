@@ -1,0 +1,3 @@
+AWS_ECR_REPOSITORY_URL = "<<awsAccountId>>.<<url>>/<<repositoryName>>"
+AWS_REGION             = "your-region"
+AWS_S3_BUCKET          = "your-bucket"
