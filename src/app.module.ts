@@ -20,6 +20,8 @@ export class AppModule {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   async onModuleInit(): Promise<void> {
+    console.log(`Build from: `, process.env.TF_VAR_BRANCH_NAME);
+
     if (this.dataSource.options.synchronize) {
       return;
     }

@@ -1,0 +1,164 @@
+version: 2.1
+
+defaults: &defaults
+  resource_class: small
+  working_directory: ~/repo
+  docker:
+    - image: cimg/node:20.10.0
+
+orbs:
+  aws-ecr: circleci/aws-ecr@9.0.2
+  aws-cli: circleci/aws-cli@4.1.2
+
+aliases:
+  - &feature_env_reg '^feature-env/.+$'
+  - &cacheKey v-{{ .Environment.CACHE_VERSION_TIMESTAMP}}-dependencies-{{checksum "package-lock.json"}}-{{ .Environment.CIRCLE_SHA1 }}-{{ .Environment.CIRCLE_BRANCH }}
+
+commands:
+  restore-cache-and-attach:
+    steps:
+      - attach_workspace:
+          at: ~/repo
+      - restore_cache:
+          keys:
+            - *cacheKey
+
+  install-and-cache:
+    steps:
+      # No need to install the dependencies
+      # Normally you should run tests before you provision the environment. (installing deps would be needed)
+      # For the sake of simplicity this example does not cover that
+      # - run:
+      #     name: Convert package-lock.json to bun.lockb file
+      #     command: npx bun pm migrate
+      # - run: npx bun install
+      - run:
+          # why do we prefix environment variables with "TF_VAR"
+          # https://developer.hashicorp.com/terraform/language/values/variables#environment-variables
+          command: |
+            mkdir -p ./tmp/
+            branchName=$CIRCLE_BRANCH
+            echo "export TF_VAR_BRANCH_NAME=${branchName//\//-}" >> ./tmp/custom-env-vars
+            echo "export TF_VAR_AWS_S3_BUCKET=$AWS_S3_BUCKET" >> ./tmp/custom-env-vars
+            echo "export TF_VAR_AWS_REGION=$AWS_DEFAULT_REGION" >> ./tmp/custom-env-vars
+      - run: cat ./tmp/custom-env-vars
+      - save_cache:
+          paths:
+            - node_modules
+            - tmp
+          key: *cacheKey
+      - persist_to_workspace:
+          root: ~/repo
+          paths:
+            - .
+            - ./tmp/custom-env-vars
+
+  load-envs-from-file:
+    steps:
+      - run:
+          command: |
+            echo -e "Following envs will be loaded into BASH_EVN: \n$(cat ./tmp/custom-env-vars)"
+      - run: cat ./tmp/custom-env-vars >> $BASH_ENV
+      - run: env
+
+  build-to-ecr:
+    steps:
+      - aws-ecr/build_and_push_image:
+          auth:
+            - aws-cli/setup:
+                aws_access_key_id: AWS_ACCESS_KEY_ID
+                aws_secret_access_key: AWS_SECRET_ACCESS_KEY
+          account_id: ${AWS_ACCOUNT_ID}
+          create_repo: false
+          checkout: false
+          dockerfile: Dockerfile
+          path: .
+          region: $AWS_DEFAULT_REGION
+          repo: dev-envs
+          tag: '$TF_VAR_BRANCH_NAME'
+          extra_build_args: >-
+            --build-arg TF_VAR_BRANCH_NAME=$TF_VAR_BRANCH_NAME
+
+  upload-docker-compose-to-s3:
+    steps:
+      - aws-cli/setup:
+          aws_access_key_id: AWS_ACCESS_KEY_ID
+          aws_secret_access_key: AWS_SECRET_ACCESS_KEY
+      - run: aws s3 cp docker-compose.yml s3://$AWS_S3_BUCKET/dev-envs/$TF_VAR_BRANCH_NAME/docker-compose.yml
+
+  terraform-install:
+    steps:
+      - run:
+          command: |
+            wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+            echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+            sudo apt update && sudo apt install terraform=1.6.6-*
+      - run: terraform -v
+
+  terraform-init:
+    steps:
+      - run:
+          command: |
+            cd .terraform
+            terraform init \
+              -backend-config "key=dev-envs/$TF_VAR_BRANCH_NAME/terraform.tfstate" \
+              -backend-config "bucket=$TF_VAR_AWS_S3_BUCKET" \
+              -backend-config "region=$TF_VAR_AWS_REGION"
+
+  terraform-apply:
+    steps:
+      - run:
+          command: |
+            cd .terraform
+            terraform apply -auto-approve -var="AWS_ECR_REPOSITORY_URL=$AWS_ECR_REPOSITORY_URL"
+            echo "export EC2_PUBLIC_IP=$(terraform output ec2_ip_address)" >> ../tmp/custom-env-vars
+      - run:
+          when: on_fail
+          command: |
+            cd .terraform
+            terraform destroy -auto-approve
+
+jobs:
+  checkout-and-install:
+    <<: *defaults
+    steps:
+      - checkout
+      - restore-cache-and-attach
+      - install-and-cache
+
+  push-image-to-ecr:
+    <<: *defaults
+    steps:
+      - restore-cache-and-attach
+      - load-envs-from-file
+      - setup_remote_docker:
+          version: 20.10.6
+      - build-to-ecr
+
+  provision-environment:
+    <<: *defaults
+    steps:
+      - restore-cache-and-attach
+      - load-envs-from-file
+      - upload-docker-compose-to-s3
+      - terraform-install
+      - terraform-init
+      - terraform-apply
+
+workflows:
+  build-and-deploy:
+    when:
+      matches: { pattern: *feature_env_reg, value: << pipeline.git.branch >> }
+
+    jobs:
+      - approve-deploy:
+          type: approval
+      - checkout-and-install:
+          requires:
+            - approve-deploy
+      - push-image-to-ecr:
+          requires:
+            - checkout-and-install
+      - provision-environment:
+          requires:
+            - push-image-to-ecr

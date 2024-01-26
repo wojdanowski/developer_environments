@@ -36,3 +36,7 @@ lerna-debug.log*
 # Terraform
 .terraform/.terraform/**
 .terraform/*.lock.hcl
+*.tfvars
+
+# envs
+.env
