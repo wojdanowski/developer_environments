@@ -134,7 +134,10 @@ commands:
 
   terraform-destroy:
     steps:
-      - run: echo "Will destroy env << pipeline.parameters.GHA_Meta >>"
+      - run: echo "GHA_Action << pipeline.parameters.GHA_Action >>"
+      - run: echo "GHA_Actor << pipeline.parameters.GHA_Actor >>"
+      - run: echo "GHA_Event << pipeline.parameters.GHA_Event >>"
+      - run: echo "GHA_Meta << pipeline.parameters.GHA_Meta >>"
 
 jobs:
   checkout-and-install:
@@ -171,7 +174,10 @@ jobs:
 workflows:
   build-and-deploy:
     when:
-      matches: { pattern: *feature_env_reg, value: << pipeline.git.branch >> }
+      and:
+        - matches:
+            { pattern: *feature_env_reg, value: << pipeline.git.branch >> }
+        - not: << pipeline.parameters.GHA_Action >>
 
     jobs:
       - approve-deploy:
@@ -187,6 +193,13 @@ workflows:
             - push-image-to-ecr
 
   destroy-env:
-    when: << pipeline.parameters.GHA_Action >>
+    when:
+      and:
+        - << pipeline.parameters.GHA_Action >>
+        - matches:
+            {
+              pattern: *feature_env_reg,
+              value: << pipeline.parameters.GHA_Meta >>,
+            }
     jobs:
       - destroy-environment
