@@ -37,28 +37,24 @@ commands:
           keys:
             - *cacheKey
 
-  install-and-cache:
+  apply-envs:
+    parameters:
+      branch_name_to_use:
+        default: $CIRCLE_BRANCH
+        type: string
     steps:
-      # No need to install the dependencies
-      # Normally you should run tests before you provision the environment. (installing deps would be needed)
-      # For the sake of simplicity this example does not cover that
-      # - run:
-      #     name: Convert package-lock.json to bun.lockb file
-      #     command: npx bun pm migrate
-      # - run: npx bun install
       - run:
           # why do we prefix environment variables with "TF_VAR"
           # https://developer.hashicorp.com/terraform/language/values/variables#environment-variables
           command: |
             mkdir -p ./tmp/
-            branchName=$CIRCLE_BRANCH
+            branchName=<< parameters.branch_name_to_use >>
             echo "export TF_VAR_BRANCH_NAME=${branchName//\//-}" >> ./tmp/custom-env-vars
             echo "export TF_VAR_AWS_S3_BUCKET=$AWS_S3_BUCKET" >> ./tmp/custom-env-vars
             echo "export TF_VAR_AWS_REGION=$AWS_DEFAULT_REGION" >> ./tmp/custom-env-vars
       - run: cat ./tmp/custom-env-vars
       - save_cache:
           paths:
-            - node_modules
             - tmp
           key: *cacheKey
       - persist_to_workspace:
@@ -145,7 +141,7 @@ jobs:
     steps:
       - checkout
       - restore-cache-and-attach
-      - install-and-cache
+      - apply-envs
 
   push-image-to-ecr:
     <<: *defaults
@@ -170,11 +166,9 @@ jobs:
     <<: *defaults
     steps:
       - checkout
-      - run:
-          command: |
-            mkdir -p ./tmp/
-            branchName=<< pipeline.parameters.GHA_Meta >>
-            export TF_VAR_BRANCH_NAME=${branchName//\//-}
+      - apply-envs:
+          branch_name_to_use: << pipeline.parameters.GHA_Meta >>
+      - load-envs-from-file
       - terraform-install
       - terraform-init
       - terraform-destroy
