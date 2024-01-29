@@ -126,7 +126,7 @@ commands:
           when: on_fail
           command: |
             cd .terraform
-            terraform destroy -auto-approve
+            terraform destroy -auto-approve -var="AWS_ECR_REPOSITORY_URL=$AWS_ECR_REPOSITORY_URL"
 
   terraform-destroy:
     steps:
