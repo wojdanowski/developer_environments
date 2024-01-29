@@ -169,6 +169,7 @@ jobs:
   destroy-environment:
     <<: *defaults
     steps:
+      - checkout
       - run:
           command: |
             mkdir -p ./tmp/
