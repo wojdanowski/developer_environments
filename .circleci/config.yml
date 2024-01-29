@@ -133,7 +133,7 @@ commands:
       - run:
           command: |
             cd .terraform
-            terraform destroy -auto-approve
+            terraform destroy -auto-approve -var="AWS_ECR_REPOSITORY_URL=$AWS_ECR_REPOSITORY_URL"
 
 jobs:
   checkout-and-install:
