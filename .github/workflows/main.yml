@@ -9,7 +9,7 @@ jobs:
       - name: Trigger CI pipeline
         uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.1.0
         with:
-          GHA_Meta: github.event.ref
+          GHA_Meta: ${{ github.event.ref }}
         env:
           CCI_TOKEN: ${{ secrets.CCI_TOKEN }}
 
