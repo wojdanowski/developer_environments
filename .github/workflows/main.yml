@@ -7,9 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger CI pipeline
-        uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.0.5
+        uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.1.0
         with:
-          GHA_removed_branch: github.event.ref
+          GHA_Meta: github.event.ref
         env:
           CCI_TOKEN: ${{ secrets.CCI_TOKEN }}
 
