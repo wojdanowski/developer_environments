@@ -16,3 +16,12 @@ jobs:
           GHA_Meta: ${{ steps.extract_branch.outputs.branch }}
         env:
           CCI_TOKEN: ${{ secrets.CCI_TOKEN }}
+
+  print-event:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: |
+          echo "$GITHUB_CONTEXT"
