@@ -101,7 +101,7 @@ module "sg_rds_label" {
 }
 
 resource "aws_security_group" "rds" {
-  name        = module.sg_ssh_label.id
+  name        = module.sg_rds_label.id
   description = "Allow PostgreSQL inbound traffic"
   vpc_id      = aws_vpc.my_vpc.id
   depends_on  = [aws_vpc.my_vpc]
